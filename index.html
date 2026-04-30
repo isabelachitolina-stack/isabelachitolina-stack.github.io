@@ -524,6 +524,55 @@
       .hero{padding:100px 20px 60px}
       .counters-row{grid-template-columns:1fr}
     }
+
+    /* ── INTERACTIVE CHART ── */
+    .chart-section { padding: 100px 32px; max-width: 1140px; margin: 0 auto; }
+    .chart-controls {
+      display: flex; gap: 10px; margin-bottom: 36px; flex-wrap: wrap; align-items: center;
+    }
+    .chart-btn {
+      display: flex; align-items: center; gap: 7px;
+      padding: 8px 18px; border-radius: 100px; border: 1.5px solid;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+      cursor: pointer; transition: all .2s; background: transparent;
+      font-family: 'Inter', sans-serif;
+    }
+    .chart-btn.bain  { border-color: #CC0000; color: #CC0000; }
+    .chart-btn.bcg   { border-color: #2db88f; color: #2db88f; }
+    .chart-btn.mck   { border-color: #6fa8dc; color: #6fa8dc; }
+    .chart-btn.active.bain  { background: rgba(204,0,0,0.15); }
+    .chart-btn.active.bcg   { background: rgba(45,184,143,0.15); }
+    .chart-btn.active.mck   { background: rgba(111,168,220,0.15); }
+    .chart-btn .btn-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .chart-btn.bain  .btn-dot { background: #CC0000; }
+    .chart-btn.bcg   .btn-dot { background: #2db88f; }
+    .chart-btn.mck   .btn-dot { background: #6fa8dc; }
+    .chart-wrapper {
+      background: #111; border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 24px; padding: 40px 36px 28px; position: relative;
+      overflow: visible;
+    }
+    .chart-canvas-wrap { position: relative; width: 100%; }
+    .chart-tooltip {
+      position: fixed; pointer-events: none;
+      background: #1e1e1e; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; padding: 12px 16px;
+      font-size: 12px; color: #f0f0f0;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      z-index: 9999; opacity: 0; transition: opacity .15s;
+      min-width: 160px;
+    }
+    .chart-tooltip .tt-firm { font-weight: 700; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+    .chart-tooltip .tt-metric { font-size: 11px; color: #888; margin-bottom: 2px; }
+    .chart-tooltip .tt-score { font-size: 1.8rem; font-weight: 900; line-height: 1; }
+    .chart-tooltip .tt-note { font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4; }
+    .chart-legend {
+      display: flex; gap: 24px; margin-top: 20px; padding-top: 20px;
+      border-top: 1px solid rgba(255,255,255,0.05); flex-wrap: wrap;
+    }
+    .chart-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #888; }
+    .chart-legend-swatch { width: 24px; height: 4px; border-radius: 2px; }
+
   </style>
 </head>
 <body>
@@ -922,6 +971,258 @@
     </div>
   </div>
 </section>
+
+
+<!-- INTERACTIVE CHART -->
+<div class="divider"></div>
+<div class="chart-section" id="grafico">
+  <div class="section-label">Score comparativo</div>
+  <h2>Análise <span>interativa</span></h2>
+  <div class="chart-controls">
+    <button class="chart-btn bain active" data-firm="bain" onclick="toggleFirm('bain',this)">
+      <span class="btn-dot"></span> Bain &amp; Company
+    </button>
+    <button class="chart-btn bcg active" data-firm="bcg" onclick="toggleFirm('bcg',this)">
+      <span class="btn-dot"></span> BCG
+    </button>
+    <button class="chart-btn mck active" data-firm="mck" onclick="toggleFirm('mck',this)">
+      <span class="btn-dot"></span> McKinsey
+    </button>
+  </div>
+  <div class="chart-wrapper">
+    <div class="chart-canvas-wrap">
+      <canvas id="mainChart"></canvas>
+    </div>
+    <div class="chart-legend">
+      <div class="chart-legend-item"><span class="chart-legend-swatch" style="background:#CC0000"></span>Bain &amp; Company</div>
+      <div class="chart-legend-item"><span class="chart-legend-swatch" style="background:#2db88f"></span>BCG</div>
+      <div class="chart-legend-item"><span class="chart-legend-swatch" style="background:#6fa8dc"></span>McKinsey</div>
+      <div style="margin-left:auto;font-size:11px;color:#555;align-self:center">Passe o mouse sobre as barras para mais detalhes</div>
+    </div>
+  </div>
+</div>
+<div class="chart-tooltip" id="chartTooltip"></div>
+
+<script>
+(function() {
+  const DATA = {
+    metrics: [
+      { label: 'Resultados para clientes',   short: 'Resultados',    notes: ['4× crescimento vs. mercado','Dados não publicados','Dados não publicados'] },
+      { label: 'Cultura / Employer brand',   short: 'Employer brand', notes: ['#1 Glassdoor 2021 · 13 anos top 4','4.5 / 5 Glassdoor','4.2 / 5 Glassdoor'] },
+      { label: 'Inovação metodológica',      short: 'Inovação',      notes: ['Criadora do NPS (2003)','BCG Matrix – 1970','McKinsey 7-S – 1980'] },
+      { label: 'Reputação ética',            short: 'Reputação',     notes: ['Nenhum escândalo de grande escala','Case Eskom – África do Sul','Opioides – $600M settlement'] },
+      { label: 'Private Equity',             short: 'PE',            notes: ['PE Report anual – referência global','Competitivo','Competitivo'] },
+      { label: 'Implementação',              short: 'Implementação', notes: ['Modelo "True North" – fica na impl.','Entrega estratégia + alguma impl.','Foco em diagnóstico e estratégia'] },
+      { label: 'Investimento social / ESG',  short: 'ESG / Pro bono',notes: ['US$1B+ pro bono em 10 anos','BCG Social Impact','McKinsey.org'] },
+      { label: 'Seniority das equipes',      short: 'Seniority',    notes: ['Times menores, mais sênior','Times médios','Times grandes, mais juniores'] },
+    ],
+    firms: [
+      { key: 'bain', name: 'Bain & Company', color: '#CC0000', scores: [9.5, 9.4, 9.5, 9.2, 9.5, 9.0, 9.0, 8.8] },
+      { key: 'bcg',  name: 'BCG',            color: '#2db88f', scores: [8.0, 9.0, 7.5, 7.5, 7.5, 8.0, 7.5, 8.0] },
+      { key: 'mck',  name: 'McKinsey',       color: '#6fa8dc', scores: [7.5, 8.4, 7.0, 5.5, 7.5, 6.5, 7.0, 7.0] },
+    ]
+  };
+
+  const visibility = { bain: true, bcg: true, mck: true };
+  let animProgress = 0;
+  let animFrame = null;
+  let hovered = null;
+  const canvas = document.getElementById('mainChart');
+  const ctx = canvas.getContext('2d');
+  const tooltip = document.getElementById('chartTooltip');
+
+  function dpr() { return window.devicePixelRatio || 1; }
+
+  function resize() {
+    const wrap = canvas.parentElement;
+    const W = wrap.clientWidth;
+    const H = Math.max(420, DATA.metrics.length * 56);
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width  = W * dpr();
+    canvas.height = H * dpr();
+    ctx.scale(dpr(), dpr());
+    draw();
+  }
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function draw() {
+    const W = canvas.clientWidth;
+    const H = canvas.clientHeight;
+    ctx.clearRect(0, 0, W, H);
+
+    const labelW = 148;
+    const padding = { top: 16, right: 16, bottom: 8, left: labelW };
+    const chartW = W - padding.left - padding.right;
+    const metricH = H / DATA.metrics.length;
+    const activeFirms = DATA.firms.filter(f => visibility[f.key]);
+    const groupH = metricH * 0.72;
+    const barH = activeFirms.length > 0 ? Math.min(20, (groupH / activeFirms.length) - 3) : 20;
+    const groupPad = (metricH - (barH + 3) * activeFirms.length) / 2;
+
+    // grid lines
+    [0, 2.5, 5, 7.5, 10].forEach(v => {
+      const x = padding.left + (v / 10) * chartW;
+      ctx.beginPath();
+      ctx.moveTo(x, padding.top);
+      ctx.lineTo(x, H - padding.bottom);
+      ctx.strokeStyle = v === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = v === 0 ? 1 : 0.5;
+      ctx.stroke();
+      if (v > 0) {
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(v, x, H - 2);
+      }
+    });
+
+    DATA.metrics.forEach((metric, mi) => {
+      const baseY = mi * metricH;
+
+      // label
+      ctx.fillStyle = hovered && hovered.mi === mi ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.45)';
+      ctx.font = `${hovered && hovered.mi === mi ? '600' : '500'} 11px Inter, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      const labelY = baseY + metricH / 2;
+      ctx.fillText(metric.short, padding.left - 10, labelY);
+
+      // row bg on hover
+      if (hovered && hovered.mi === mi) {
+        ctx.fillStyle = 'rgba(255,255,255,0.025)';
+        ctx.fillRect(padding.left, baseY + 2, chartW, metricH - 4);
+      }
+
+      activeFirms.forEach((firm, fi) => {
+        const dataFi = DATA.firms.indexOf(firm);
+        const score = firm.scores[mi];
+        const barY = baseY + groupPad + fi * (barH + 3);
+        const barW = (score / 10) * chartW * easeOut(animProgress);
+        const isHov = hovered && hovered.mi === mi && hovered.fi === dataFi;
+
+        // gradient fill
+        const grad = ctx.createLinearGradient(padding.left, 0, padding.left + barW, 0);
+        grad.addColorStop(0, firm.color);
+        grad.addColorStop(1, firm.color + (isHov ? 'ff' : 'bb'));
+
+        ctx.beginPath();
+        const rad = barH / 2;
+        const bx = padding.left, by = barY, bw = Math.max(barW, 1), bh = barH;
+        ctx.moveTo(bx + rad, by);
+        ctx.lineTo(bx + bw - rad, by);
+        ctx.arcTo(bx + bw, by, bx + bw, by + bh, rad);
+        ctx.lineTo(bx + bw, by + bh - rad);
+        ctx.arcTo(bx + bw, by + bh, bx + bw - rad, by + bh, rad);
+        ctx.lineTo(bx + rad, by + bh);
+        ctx.arcTo(bx, by + bh, bx, by + bh - rad, rad);
+        ctx.lineTo(bx, by + rad);
+        ctx.arcTo(bx, by, bx + rad, by, rad);
+        ctx.closePath();
+        ctx.fillStyle = isHov ? firm.color : grad;
+        ctx.globalAlpha = isHov ? 1 : 0.85;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // glow on hover
+        if (isHov) {
+          ctx.shadowColor = firm.color;
+          ctx.shadowBlur = 12;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
+        // score label on bar
+        if (animProgress > 0.6 && barW > 30) {
+          ctx.fillStyle = 'rgba(255,255,255,0.9)';
+          ctx.font = `700 ${barH < 16 ? 9 : 10}px Inter, sans-serif`;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(score.toFixed(1), padding.left + barW + 5, barY + barH / 2);
+        }
+      });
+    });
+  }
+
+  function animate(from) {
+    if (animFrame) cancelAnimationFrame(animFrame);
+    const start = performance.now();
+    const dur = 900;
+    function step(ts) {
+      const p = Math.min((ts - start) / dur, 1);
+      animProgress = from + (1 - from) * easeOut(p);
+      draw();
+      if (p < 1) animFrame = requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // hit test
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const W = canvas.clientWidth;
+    const H = canvas.clientHeight;
+    const labelW = 148;
+    const chartW = W - labelW - 16;
+    const metricH = H / DATA.metrics.length;
+    const activeFirms = DATA.firms.filter(f => visibility[f.key]);
+    const barH = Math.min(20, (metricH * 0.72 / activeFirms.length) - 3);
+    const groupPad = (metricH - (barH + 3) * activeFirms.length) / 2;
+    let found = null;
+    DATA.metrics.forEach((_, mi) => {
+      const baseY = mi * metricH;
+      activeFirms.forEach((firm, fi) => {
+        const dataFi = DATA.firms.indexOf(firm);
+        const score = firm.scores[mi];
+        const barY = baseY + groupPad + fi * (barH + 3);
+        const barW = (score / 10) * chartW;
+        if (mx >= labelW && mx <= labelW + barW + 30 && my >= barY && my <= barY + barH) {
+          found = { mi, fi: dataFi, firm, metric: DATA.metrics[mi], score };
+        }
+      });
+    });
+    hovered = found;
+    draw();
+    if (found) {
+      const note = found.metric.notes[found.fi];
+      tooltip.innerHTML = `
+        <div class="tt-firm" style="color:${found.firm.color}">${found.firm.name}</div>
+        <div class="tt-metric">${found.metric.label}</div>
+        <div class="tt-score" style="color:${found.firm.color}">${found.score.toFixed(1)}<span style="font-size:1rem;color:#888"> /10</span></div>
+        <div class="tt-note">${note}</div>
+      `;
+      tooltip.style.opacity = '1';
+      tooltip.style.left = (e.clientX + 16) + 'px';
+      tooltip.style.top  = (e.clientY - 60) + 'px';
+    } else {
+      tooltip.style.opacity = '0';
+    }
+  });
+  canvas.addEventListener('mouseleave', () => {
+    hovered = null; draw(); tooltip.style.opacity = '0';
+  });
+
+  window.toggleFirm = function(key, btn) {
+    visibility[key] = !visibility[key];
+    btn.classList.toggle('active', visibility[key]);
+    btn.style.opacity = visibility[key] ? '1' : '0.35';
+    animProgress = 0;
+    animate(0);
+  };
+
+  // scroll trigger
+  const io = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) { animate(0); io.disconnect(); }
+  }, { threshold: 0.2 });
+  io.observe(canvas);
+
+  window.addEventListener('resize', resize);
+  resize();
+})();
+</script>
 
 <!-- TABELA -->
 <div class="divider"></div>
